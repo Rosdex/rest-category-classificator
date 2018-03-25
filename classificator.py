@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import os
 
 from sklearn import svm
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -9,18 +10,24 @@ from sklearn.utils import shuffle
 #wrapper for Tomita parser
 from tomita_parser import TomitaParser
 
+BASE_PATH = os.path.dirname(os.path.abspath(__file__))
+
+ML_MODELS_DIR = 'ml_models'
+TOMITA_BIN_PATH = '\\'.join([BASE_PATH, 'tomita', 'tomitaparser.exe'])
+TOMITA_CONFIG_PATH = '\\'.join([BASE_PATH, 'tomita', 'config', 'config.proto'])
+
 class CategoryClassificator:
 
     def __init__(self):
         # prepare Tomita Parser
-        self.tomita = TomitaParser('C:\\Temp\\Rosdex-ML\\dev\\rest_category_classificator\\tomita\\tomitaparser.exe', 'C:\\Temp\\Rosdex-ML\\dev\\rest_category_classificator\\tomita\\config\\config.proto', debug=False)
+        self.tomita = TomitaParser(TOMITA_BIN_PATH, TOMITA_CONFIG_PATH, debug=False)
 
         # load vectorizator
-        vectorizator_path = 'models\\vectorizator.sav'
+        vectorizator_path = '/'.join([ML_MODELS_DIR,'vectorizator.sav'])
         self.vectorizer = joblib.load(vectorizator_path)
 
         # load svm classification model
-        svm_path = 'models\\svm.sav'
+        svm_path = '/'.join([ML_MODELS_DIR,'svm.sav'])
         self.clf = joblib.load(svm_path)
 
     def predict_category_id(self, product_name):

@@ -1,64 +1,106 @@
-import json
-from eve import Eve
-from eve_fsmediastorage import FileSystemMediaStorage
-from classificator import CategoryClassificator
-from flask_pymongo import PyMongo
-#------------------------------------------------------------------
+import os
+import uuid
 
-def post_task_get_callback(request, payload):
-    print('A GET on "task" was just performed!')
-
-def post_task_post_callback(request, response):
-    print('A POST on "task" was just performed!')
-    print(request.files)
-    print('------------')
-
-    data = response.get_data()
-    data = data.decode("utf-8")
-    print(data)
-    data = json.loads(data)
-
-    task_id = data['_id']
-    print('Task id = {0}'.format(task_id))
-
-    #task_files = mongo.db.tasks_files
-    #task_file = task_files.find_one({'_id' : task_id})
-
-    #if task_file:
-    #    output = 'Filename is {0}'.format()
-    #else:
-    #    output = "No such name"
-    #print(output)
+#from classificator import CategoryClassificator
+from job_model import JobStatus, Job, JobSchema
+from flask import Flask, request, send_file,  jsonify
 
 
+# Constants
+# =========
+
+APP_ROOT = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_DIR = 'uploads'
+RESULT_DIR = 'result_files'
+
+# Extensions initialization
+# =========================
+app = Flask(__name__)
 
 
-app = Eve(media=FileSystemMediaStorage)
+jobs = []
 
-mongoObj = PyMongo(app)
+# Routes
+# ======
+@app.route("/")
+def defalut_route():
+    return 'Welcome to catecory prediction service'
 
-app.on_post_GET_tasks += post_task_get_callback
-app.on_post_POST_tasks += post_task_post_callback
+@app.route('/jobs')
+def get_jobs():
+    schema = JobSchema(many=True)
+    jobs_dump = schema.dump(jobs)
+    return jsonify(jobs_dump.data)
 
+@app.route('/jobs', methods=['POST'])
+def create_job():
+    # Step 0 - Generate UUID for new Job
+    job_uuid = uuid.uuid1().hex
 
-@app.route('/hello')
-def hello_world():
-    ML_classificator = CategoryClassificator()
+    # Step 1 - upload file
+    input_filename = upload_file(job_uuid)
+    print('File was uploaded, name is {0}'.format(input_filename))
 
-    product_name = 'Фонарь налобный Petzl Tikka 2'
+    # Step 2 - Create job
+    job = Job(job_uuid, input_filename)
 
-    category_dict = {114636: 'Дрели', 1: 'Шины', 2: 'Диски', 1630: 'Дальномеры', 114637: 'Фонари', 114838: 'Струбцина и зажимы', 
-        114856: 'цепи для инструментов', 114862: 'Бензопилы', 114903: 'Корды для триммеров', 114906: 'Газонокосилки',
-        115047: 'Буры', 115117: 'Сверла'}
+    # Step 3 - Save data about Job
+    jobs.append(job)
 
-    predicted_value = ML_classificator.predict_category_id(product_name)
+    # Step 4 - Prepare response 
+    schema = JobSchema(many=False)
+    job_dump = schema.dump(job)
 
-    return category_dict[predicted_value[0]]
+    return jsonify(job_dump.data)
 
-@app.route('/hello/<username>')
-def show_user_profile(username):
-    # show the user profile for that user
-    return 'User %s' % username
+@app.route('/jobs/<uuid>/perform', methods = ['POST'])
+def perform_job(uuid):
+    job = get_job_by_id(uuid)
 
-if __name__ == '__main__':
-    app.run()
+    if job != None:
+        job.exec_job()
+        return "", 204
+    else:
+        return "", 404
+
+@app.route('/jobs/<uuid>', methods = ['GET'])
+def get_job(uuid):
+    job = get_job_by_id(uuid)
+
+    if job != None:
+        schema = JobSchema(many=False)
+        job_dump = schema.dump(job)
+        return jsonify(job_dump.data)
+    else:
+        return "", 404
+
+@app.route('/jobs/<uuid>/result', methods = ['GET'])
+def get_job_result(uuid):
+    job = get_job_by_id(uuid)
+
+    if job != None:
+        result_filename = job.get_result_filename()
+        if result_filename != '':
+            return send_file('/'.join([APP_ROOT, RESULT_DIR, result_filename]), attachment_filename=result_filename)
+    else:
+        return "", 404
+
+# Helper functions
+# ================
+def get_job_by_id(uuid):
+    target_job = None
+
+    for job in jobs:
+        if job.get_id() == uuid:
+            target_job = job
+
+    return target_job
+
+def upload_file(name_prefix):
+    target = os.path.join(APP_ROOT, UPLOAD_DIR)
+
+    for upload in request.files.getlist("file"):
+        filename = '_'.join([name_prefix, upload.filename])
+        upload.save('/'.join([target, filename]))
+
+    return filename
