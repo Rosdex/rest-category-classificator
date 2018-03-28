@@ -1,10 +1,10 @@
 import datetime as dt
 import csv
 
-from classificator import CategoryClassificator
-
 from marshmallow import Schema, fields
 from enum import Enum
+
+from classificator import CategoryClassificator
 
 UPLOAD_DIR = 'uploads'
 RESULT_DIR = 'result_files'
@@ -16,7 +16,7 @@ class JobStatus(Enum):
     ERROR = "ERROR"
 
 class Job():
-    def __init__(self, uuid, input_fiename):
+    def __init__(self, uuid, input_fiename, ml_model_config):
         print('Create job with id = {0}'.format(uuid))
         print('Inpur filename = {0}'.format(input_fiename))
 
@@ -25,22 +25,30 @@ class Job():
         self.output_file = ''
         self.status = JobStatus.CREATED
         self.created_at = dt.datetime.now()
+        self.ml_model_config = ml_model_config
 
 
     def exec_job(self):
         # Step 0 - Exctact product names
         products_names = self.get_product_names()
 
-        # Step 1 - Create classificator
-        ML_classificator = CategoryClassificator()
+        # Step 1 - Get ml model settings
+        vectr_filename = self.ml_model_config.get_vect_filename()
+        classif_filename = self.ml_model_config.get_classif_filename()
 
-        # Step 2 - Predict categories
+        print('Vect filename is {0}'.format(vectr_filename))
+        print('Classif_filename is {0}'.format(classif_filename))
+
+        # Step 2 - Create classificator
+        ML_classificator = CategoryClassificator(vectr_filename, classif_filename)
+
+        # Step 3 - Predict categories
         product_categories = self.predict_products_categories(ML_classificator, products_names)
 
-        # Step 3 - merge product names and predicted categories
+        # Step 4 - merge product names and predicted categories
         result_list = zip(products_names, product_categories)
 
-        # Step 4 - create result file
+        # Step 5 - create result file
         self.output_file = self.generate_output_file(result_list)
         self.status = JobStatus.DONE
 

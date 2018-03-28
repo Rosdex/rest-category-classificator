@@ -1,11 +1,12 @@
 ﻿from classificator import CategoryClassificator
 
 if __name__ == "__main__":
-    ML_classificator = CategoryClassificator()
+    ML_classificator = CategoryClassificator('vectorizator.sav', 'svm.sav')
 
     product_name = 'Фонарь налобный Petzl Tikka 2'
+    product_name = 'Силовая дрель Boshe super 15x'
 
-    category_dict = {114636: 'Дрели', 1: 'Шины', 2: 'Диски', 1630: 'Дальномеры', 114637: 'Фонари', 114838: 'Струбцина и зажимы', 
+    category_dict = {'114636': 'Дрели', 1: 'Шины', 2: 'Диски', 1630: 'Дальномеры', '114637': 'Фонари', 114838: 'Струбцина и зажимы', 
         114856: 'цепи для инструментов', 114862: 'Бензопилы', 114903: 'Корды для триммеров', 114906: 'Газонокосилки',
         115047: 'Буры', 115117: 'Сверла'}
 
