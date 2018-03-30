@@ -1,3 +1,4 @@
+# -*- encoding: utf-8 -*-
 import numpy as np
 import pandas as pd
 import os
@@ -7,28 +8,21 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.externals import joblib
 from sklearn.utils import shuffle
 
-#wrapper for Tomita parser
+from settings import BaseConfig
 from tomita_parser import TomitaParser
-
-BASE_PATH = os.path.dirname(os.path.abspath(__file__))
-
-ML_MODELS_DIR = 'ml_models'
-
-TOMITA_BIN_PATH = '\\'.join([BASE_PATH, 'tomita', 'tomitaparser.exe'])
-TOMITA_CONFIG_PATH = '\\'.join([BASE_PATH, 'tomita', 'config', 'config.proto'])
 
 class CategoryClassificator:
 
     def __init__(self, vectorizator_name, classififcator_name):
         # prepare Tomita Parser
-        self.tomita = TomitaParser(TOMITA_BIN_PATH, TOMITA_CONFIG_PATH, debug=False)
+        self.tomita = TomitaParser(BaseConfig.TOMITA_BIN_PATH, BaseConfig.TOMITA_CONFIG_PATH, debug=False)
 
         # load vectorizator
-        vectorizator_path = '/'.join([ML_MODELS_DIR, vectorizator_name])
+        vectorizator_path = '/'.join([BaseConfig.ML_MODELS_DIR, vectorizator_name])
         self.vectorizer = joblib.load(vectorizator_path)
 
         # load svm classification model
-        svm_path = '/'.join([ML_MODELS_DIR, classififcator_name])
+        svm_path = '/'.join([BaseConfig.ML_MODELS_DIR, classififcator_name])
         self.clf = joblib.load(svm_path)
 
     def predict_category_id(self, product_name):

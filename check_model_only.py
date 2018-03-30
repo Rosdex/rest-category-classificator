@@ -1,4 +1,5 @@
-﻿from classificator import CategoryClassificator
+﻿# -*- encoding: utf-8 -*-
+from classificator import CategoryClassificator
 
 if __name__ == "__main__":
     ML_classificator = CategoryClassificator('vectorizator.sav', 'svm.sav')

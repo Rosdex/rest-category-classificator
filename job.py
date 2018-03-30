@@ -1,13 +1,12 @@
+# -*- encoding: utf-8 -*-
 import datetime as dt
 import csv
 
 from marshmallow import Schema, fields
 from enum import Enum
 
+from settings import BaseConfig
 from classificator import CategoryClassificator
-
-UPLOAD_DIR = 'uploads'
-RESULT_DIR = 'result_files'
 
 class JobStatus(Enum):
     CREATED = "CREATED"
@@ -29,33 +28,36 @@ class Job():
 
 
     def exec_job(self):
-        # Step 0 - Exctact product names
+        # Step 0 - Set status Performing
+        self.status = JobStatus.PERFORMING
+
+        # Step 1 - Exctact product names
         products_names = self.get_product_names()
 
-        # Step 1 - Get ml model settings
+        # Step 2 - Get ml model settings
         vectr_filename = self.ml_model_config.get_vect_filename()
         classif_filename = self.ml_model_config.get_classif_filename()
 
         print('Vect filename is {0}'.format(vectr_filename))
         print('Classif_filename is {0}'.format(classif_filename))
 
-        # Step 2 - Create classificator
+        # Step 3 - Create classificator
         ML_classificator = CategoryClassificator(vectr_filename, classif_filename)
 
-        # Step 3 - Predict categories
+        # Step 4 - Predict categories
         product_categories = self.predict_products_categories(ML_classificator, products_names)
 
-        # Step 4 - merge product names and predicted categories
+        # Step 5 - merge product names and predicted categories
         result_list = zip(products_names, product_categories)
 
-        # Step 5 - create result file
+        # Step 6 - create result file
         self.output_file = self.generate_output_file(result_list)
         self.status = JobStatus.DONE
 
 
     def get_product_names(self):
         product_names = []
-        filename = '\\'.join([UPLOAD_DIR, self.input_file])
+        filename = '\\'.join([BaseConfig.UPLOAD_DIR, self.input_file])
 
         with open(filename, newline='', encoding="utf8") as csvfile:
             csvreader = csv.reader(csvfile, delimiter=',', quotechar='|')
@@ -76,7 +78,7 @@ class Job():
     def generate_output_file(self, result_list):
         filename = '_'.join([self.uuid, 'output.csv'])
 
-        with open('\\'.join([RESULT_DIR, filename]),'wt', encoding='utf8') as file:
+        with open('\\'.join([BaseConfig.RESULT_DIR, filename]),'wt', encoding='utf8') as file:
             for item in result_list:
                 file.write('{0},{1}'.format(item[0], item[1][0]))
                 file.write('\n')

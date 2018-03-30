@@ -1,24 +1,21 @@
+# -*- encoding: utf-8 -*-
 import os
 import uuid
 import json
 
-from job import JobStatus, Job, JobSchema
 from flask import Flask, request, send_file,  jsonify
+from threading import Thread
 
-from classificator_settings import ModelConfig, ModelConfigSchema
-
-# Constants
-# =========
-APP_ROOT = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_DIR = 'uploads'
-ML_MODEL_DIR = 'ml_models'
-RESULT_DIR = 'result_files'
+from settings import BaseConfig
+from job import JobStatus, Job, JobSchema
+from classificator_config import ModelConfig, ModelConfigSchema
 
 # Extensions initialization
 # =========================
 app = Flask(__name__)
 
-
+# Data layer - Collections
+# ========================
 jobs = []
 available_ml_models = []
 active_model_uuid = []
@@ -27,6 +24,7 @@ active_model_uuid = []
 # ================
 @app.before_first_request
 def add_default_ml_model():
+    # Setup default ml model
     active_model_uuid.append(uuid.uuid1().hex)
 
     ml_model = ModelConfig(
@@ -56,7 +54,7 @@ def create_job():
     job_uuid = uuid.uuid1().hex
 
     # Step 1 - upload file
-    input_filenames = upload_files(UPLOAD_DIR, job_uuid)
+    input_filenames = upload_files(BaseConfig.UPLOAD_DIR, job_uuid)
     print('File was uploaded, name is {0}'.format(input_filenames[0]))
 
     # Step 2 - Get current ml model config
@@ -71,19 +69,17 @@ def create_job():
     # Step 4 - Save data about Job
     jobs.append(job)
 
-    # Step 5 - Prepare response 
-    schema = JobSchema(many=False)
-    job_dump = schema.dump(job)
-
-    return jsonify(job_dump.data)
+    # Step 5 - Send response 
+    return job_to_json(job)
 
 @app.route('/jobs/<uuid>/perform', methods = ['POST'])
 def perform_job(uuid):
     job = get_item_by_id(jobs, uuid)
 
-    if job != None:
-        job.exec_job()
-        return "", 204
+    if job:
+        thr = Thread(target=perform_async_job, args=[app, job])
+        thr.start()
+        return job_to_json(job)
     else:
         return "", 404
 
@@ -91,10 +87,8 @@ def perform_job(uuid):
 def get_job(uuid):
     job = get_item_by_id(jobs, uuid)
 
-    if job != None:
-        schema = JobSchema(many=False)
-        job_dump = schema.dump(job)
-        return jsonify(job_dump.data)
+    if job:
+        return job_to_json(job)
     else:
         return "", 404
 
@@ -102,10 +96,10 @@ def get_job(uuid):
 def get_job_result(uuid):
     job = get_item_by_id(jobs, uuid)
 
-    if job != None:
+    if job:
         result_filename = job.get_result_filename()
         if result_filename != '':
-            return send_file('/'.join([APP_ROOT, RESULT_DIR, result_filename]), attachment_filename=result_filename)
+            return send_file('/'.join([BaseConfig.APP_ROOT, BaseConfig.RESULT_DIR, result_filename]), attachment_filename=result_filename)
     else:
         return "", 404
 
@@ -121,10 +115,8 @@ def get_ml_models():
 def get_ml_model(uuid):
     ml_model = get_item_by_id(available_ml_models, uuid)
 
-    if ml_model != None:
-        schema = ModelConfigSchema(many=False)
-        ml_model_dump = schema.dump(ml_model)
-        return jsonify(ml_model_dump.data)
+    if ml_model:
+        return model_to_json(ml_model)
     else:
         return "", 404
 
@@ -134,7 +126,7 @@ def add_ml_model():
     ml_model_uuid = uuid.uuid1().hex
 
     # Step 1 - upload file
-    input_filenames = upload_files(ML_MODEL_DIR, ml_model_uuid)
+    input_filenames = upload_files(BaseConfig.ML_MODELS_DIR, ml_model_uuid)
     print(input_filenames)
 
     # Step 2 find vectorizator file
@@ -155,26 +147,19 @@ def add_ml_model():
     active_model_uuid.clear()
     active_model_uuid.append(ml_model_uuid)
 
-    # Step 6 - Prepare response 
-    schema = ModelConfigSchema(many=False)
-    ml_model_dump = schema.dump(ml_model)
-
-    return jsonify(ml_model_dump.data)
+    # Step 6 - Send response
+    return model_to_json(ml_model) 
 
 # Helper functions
 # ================
 def get_item_by_id(collection, uuid):
-    target_item = None
-
     for item in collection:
         if item.get_id() == uuid:
-            target_item = item
-            break
-
-    return target_item
+            return item
+    return None
 
 def upload_files(dir_prefix, name_prefix):
-    target = os.path.join(APP_ROOT, dir_prefix)
+    target = os.path.join(BaseConfig.APP_ROOT, dir_prefix)
     filenames = []
 
     for upload in request.files.getlist("file"):
@@ -183,3 +168,19 @@ def upload_files(dir_prefix, name_prefix):
         filenames.append(filename)
 
     return filenames
+
+def perform_async_job(app, job):
+    with app.app_context():
+        print('----- Start async Job -----')
+        job.exec_job()
+        print('----- End async Job -----')
+
+def job_to_json(job):
+    schema = JobSchema(many=False)
+    job_dump = schema.dump(job)
+    return jsonify(job_dump.data)
+
+def model_to_json(ml_model):
+    schema = ModelConfigSchema(many=False)
+    ml_model_dump = schema.dump(ml_model)
+    return jsonify(ml_model_dump.data)
