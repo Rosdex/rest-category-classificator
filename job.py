@@ -14,6 +14,9 @@ class JobStatus(Enum):
     DONE = "DONE"
     ERROR = "ERROR"
 
+    def __str__(self):
+        return str(self.value)
+
 class Job():
     def __init__(self, uuid, input_fiename, ml_model_config):
         print('Create job with id = {0}'.format(uuid))
@@ -32,7 +35,7 @@ class Job():
         self.status = JobStatus.PERFORMING
 
         # Step 1 - Exctact product names
-        products_names = self.get_product_names()
+        products_names, product_ids = self.get_product_names()
 
         # Step 2 - Get ml model settings
         vectr_filename = self.ml_model_config.get_vect_filename()
@@ -48,7 +51,8 @@ class Job():
         product_categories = self.predict_products_categories(ML_classificator, products_names)
 
         # Step 5 - merge product names and predicted categories
-        result_list = zip(products_names, product_categories)
+        # result_list = zip(products_names, product_categories)
+        result_list = zip(product_ids, product_categories)
 
         # Step 6 - create result file
         self.output_file = self.generate_output_file(result_list)
@@ -57,19 +61,24 @@ class Job():
 
     def get_product_names(self):
         product_names = []
+        product_ids = []
         filename = '\\'.join([BaseConfig.UPLOAD_DIR, self.input_file])
 
         with open(filename, newline='', encoding="utf8") as csvfile:
-            csvreader = csv.reader(csvfile, delimiter=',', quotechar='|')
+            csvreader = csv.reader(csvfile, delimiter=',', quotechar='"')
             for row in csvreader:
-                product_names.append(row[0])
+                # xantzhe
+                product_ids.append(row[0])
+                product_names.append(row[1])
+                print('DEBUG name = {0}'.format(row[1]))
 
-        return product_names
+        return product_names, product_ids
 
     def predict_products_categories(self, classificator, product_names):
         product_categories = []
 
         for name in product_names:
+            print('name is {0}'.format(name))
             category_id = classificator.predict_category_id(name)
             product_categories.append(category_id)
 
@@ -104,7 +113,7 @@ class Job():
 
 class JobSchema(Schema):
     uuid = fields.Str()
-    input_file = fields.Str()
-    output_file = fields.Str()
+    #input_file = fields.Str()
+    #output_file = fields.Str()
     status = fields.Str()
     created_at = fields.Date()
